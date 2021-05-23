@@ -1,0 +1,10 @@
+apiVersion: olm.operatorframework.io/v1
+kind: Subscription
+metadata:
+  name: foo
+spec:
+  approval: Automatic
+  constraint:
+    any:
+    - channel: alpha
+  package: foo

@@ -1,0 +1,8 @@
+## Append samples you want in your CSV to this file as resources ##
+resources:
+- olm_v1_pathselectorclass.yaml
+- olm_v1_pathselector.yaml
+- olm_v1_subscription.yaml
+- olm_v1_index.yaml
+- olm_v1_operator.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

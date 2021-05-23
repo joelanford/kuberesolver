@@ -1,0 +1,8 @@
+apiVersion: olm.operatorframework.io/v1
+kind: PathSelectorClass
+metadata:
+  name: olm-highest-semver
+  annotations:
+    pathselectorclass.olm.operatorframework.io/is-default-class: "true"
+spec:
+  controller: olm.operatorframework.io/highest-semver

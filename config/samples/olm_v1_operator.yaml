@@ -1,0 +1,7 @@
+apiVersion: olm.operatorframework.io/v1
+kind: Operator
+metadata:
+  name: foo
+spec:
+  package: foo
+  version: 0.1.0

@@ -1,0 +1,53 @@
+domain: operatorframework.io
+layout:
+- go.kubebuilder.io/v3
+plugins:
+  manifests.sdk.operatorframework.io/v2: {}
+  scorecard.sdk.operatorframework.io/v2: {}
+projectName: kuberesolver
+repo: kuberesolver
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: operatorframework.io
+  group: olm
+  kind: PathSelectorClass
+  path: kuberesolver/api/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: operatorframework.io
+  group: olm
+  kind: PathSelector
+  path: kuberesolver/api/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: operatorframework.io
+  group: olm
+  kind: Subscription
+  path: kuberesolver/api/v1
+  version: v1
+- api:
+    crdVersion: v1
+  domain: operatorframework.io
+  group: olm
+  kind: Index
+  path: kuberesolver/api/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: operatorframework.io
+  group: olm
+  kind: Operator
+  path: kuberesolver/api/v1
+  version: v1
+version: "3"

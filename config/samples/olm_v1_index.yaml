@@ -1,0 +1,54 @@
+apiVersion: olm.operatorframework.io/v1
+kind: Index
+metadata:
+  name: index-sample
+spec:
+  priority: 0
+  packages:
+    - name: foo
+      bundles:
+        - version: 0.1.0
+          channels:
+          - alpha
+          upgradesFrom: []
+          labels:
+            major: "0"
+            minor: "0.1"
+        - version: 0.2.0
+          channels:
+          - alpha
+          upgradesFrom: [0.1.0]
+          labels:
+            major: "0"
+            minor: "0.2"
+        - version: 0.3.0
+          channels:
+          - alpha
+          upgradesFrom: [0.2.0]
+          labels:
+            major: "0"
+            minor: "0.3"
+        - version: 0.4.0
+          channels:
+          - alpha
+          - beta
+          upgradesFrom: [0.1.0]
+          labels:
+            major: "0"
+            minor: "0.4"
+        - version: 0.5.0
+          channels:
+          - beta
+          - stable
+          upgradesFrom: [0.3.0, 0.4.0]
+          labels:
+            major: "0"
+            minor: "0.5"
+        - version: 0.6.0
+          channels:
+          - stable
+          upgradesFrom: [0.5.0]
+          labels:
+            major: "0"
+            minor: "0.6"
+            olm.channels: "stable"

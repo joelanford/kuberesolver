@@ -1,0 +1,24 @@
+# permissions for end users to edit indices.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: index-editor-role
+rules:
+- apiGroups:
+  - olm.operatorframework.io
+  resources:
+  - indices
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - olm.operatorframework.io
+  resources:
+  - indices/status
+  verbs:
+  - get
