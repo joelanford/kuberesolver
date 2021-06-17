@@ -30,7 +30,7 @@ type PathSelectorSpec struct {
 	//+kubebuilder:validation:Optional
 	PathSelectorClassName string `json:"pathSelectorClassName,omitempty"`
 
-	// Candidates is a list of candidate choices for a path strategy to select
+	// Candidates is a list of candidate choices for a path selector to select
 	// from.
 	Candidates []Candidate `json:"candidates"`
 }

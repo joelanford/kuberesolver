@@ -38,7 +38,7 @@ spec:
             properties:
               candidates:
                 description: Candidates is a list of candidate choices for a path
-                  strategy to select from.
+                  selector to select from.
                 items:
                   description: Candidate contains a unique name for a resolution candidate
                     and all of its properties. A path selector evaluates candidate
