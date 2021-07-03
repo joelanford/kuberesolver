@@ -66,7 +66,6 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err := r.Get(ctx, req.NamespacedName, sub); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	sub.Status = olmv1.SubscriptionStatus{}
 
 	operatorKey := types.NamespacedName{
 		Namespace: sub.Namespace,
@@ -78,23 +77,24 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, err
 		}
 	}
-	sub.Status.Installed = operator.Spec.Version
+	updatedStatus := olmv1.SubscriptionStatus{
+		Installed: operator.Spec.Version,
+	}
 
 	idx, pkg, err := r.getIndexAndPackage(ctx, *sub)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	if pkg == nil {
-		sub.Status = olmv1.SubscriptionStatus{}
+		updatedStatus.Message = "package not found"
+		updatedStatus.ResolutionPhase = olmv1.PhaseFailed
 		if idx != nil {
-			sub.Status.IndexRef = indexRef(*idx)
+			updatedStatus.IndexRef = indexRef(*idx)
 		}
-		sub.Status.Message = "package not found"
-		sub.Status.ResolutionPhase = olmv1.PhaseFailed
-		return ctrl.Result{}, r.Status().Update(ctx, sub)
+		return ctrl.Result{}, r.updateStatus(ctx, sub, updatedStatus)
 	}
 
-	return ctrl.Result{}, r.resolve(ctx, sub, *pkg)
+	return ctrl.Result{}, r.resolve(ctx, sub, *pkg, updatedStatus)
 }
 
 func indexRef(idx olmv1.Index) *v1.ObjectReference {
@@ -168,40 +168,56 @@ func constrainCandidateBundles(bundles []olmv1.Bundle, constraint *olmv1.Constra
 	return bundles, nil
 }
 
-func (r *SubscriptionReconciler) resolve(ctx context.Context, sub *olmv1.Subscription, pkg olmv1.Package) error {
-	sub.Status.Paths = &olmv1.SubscriptionPaths{}
+func (r *SubscriptionReconciler) updateStatus(ctx context.Context, sub *olmv1.Subscription, status olmv1.SubscriptionStatus) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err := r.Get(ctx, client.ObjectKeyFromObject(sub), sub); err != nil {
+			return err
+		}
+		sub.Status = status
+		return r.Status().Update(ctx, sub)
+	})
+}
+
+func (r *SubscriptionReconciler) resolve(ctx context.Context, sub *olmv1.Subscription, pkg olmv1.Package, updatedStatus olmv1.SubscriptionStatus) error {
+	updatedStatus.Paths = &olmv1.SubscriptionPaths{}
 
 	all := allCandidateBundles(pkg, sub.Status.Installed)
-	sub.Status.Paths.All = bundlesToCandidates(all...)
+	updatedStatus.Paths.All = bundlesToCandidates(all...)
 
 	filtered, err := constrainCandidateBundles(all, sub.Spec.Constraint)
 	if err != nil {
-		return fmt.Errorf("apply candidate constraints from subscription: %v", err)
+		updatedStatus.Message = fmt.Sprintf("Failed to apply constraint: %v", err)
+		updatedStatus.ResolutionPhase = olmv1.PhaseFailed
+		return r.updateStatus(ctx, sub, updatedStatus)
 	}
+
 	candidates := bundlesToCandidates(filtered...)
-	sub.Status.Paths.Filtered = candidates
-	sub.Status.UpgradeAvailable = len(candidates) > 0
+	updatedStatus.Paths.Filtered = candidates
+	updatedStatus.UpgradeAvailable = len(candidates) > 0
 
 	switch len(candidates) {
 	case 0:
-		sub.Status.ResolutionPhase = olmv1.PhaseSucceeded
-		sub.Status.Message = "No upgrades available"
+		updatedStatus.ResolutionPhase = olmv1.PhaseSucceeded
+		updatedStatus.Message = "No upgrades available"
 	case 1:
-		sub.Status.ResolutionPhase = olmv1.PhaseSucceeded
-		sub.Status.Message = "Found 1 candidate that matches constraints"
-		sub.Status.UpgradeTo = candidates[0].Version
-		sub.Status.UpgradeSelected = true
+		updatedStatus.ResolutionPhase = olmv1.PhaseSucceeded
+		updatedStatus.Message = "Found 1 candidate that matches constraints"
+		updatedStatus.UpgradeTo = candidates[0].Version
+		updatedStatus.UpgradeSelected = true
 	default:
 		res, err := r.selectPath(ctx, *sub, candidates)
 		if err != nil {
-			return err
+			updatedStatus.Message = fmt.Sprintf("Failed to select upgrade path: %v", err)
+			updatedStatus.ResolutionPhase = olmv1.PhaseFailed
+		} else {
+			updatedStatus.ResolutionPhase = res.phase
+			updatedStatus.Message = res.message
+			updatedStatus.UpgradeTo = res.selection
+			updatedStatus.UpgradeSelected = res.selection != ""
 		}
-		sub.Status.ResolutionPhase = res.phase
-		sub.Status.Message = res.message
-		sub.Status.UpgradeTo = res.selection
-		sub.Status.UpgradeSelected = res.selection != ""
+
 	}
-	return r.Status().Update(ctx, sub)
+	return r.updateStatus(ctx, sub, updatedStatus)
 }
 
 func bundlesToCandidates(bundles ...olmv1.Bundle) []olmv1.Candidate {
