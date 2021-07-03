@@ -180,6 +180,7 @@ func (r *SubscriptionReconciler) resolve(ctx context.Context, sub *olmv1.Subscri
 	}
 	candidates := bundlesToCandidates(filtered...)
 	sub.Status.Paths.Filtered = candidates
+	sub.Status.UpgradeAvailable = len(candidates) > 0
 
 	switch len(candidates) {
 	case 0:
@@ -189,7 +190,7 @@ func (r *SubscriptionReconciler) resolve(ctx context.Context, sub *olmv1.Subscri
 		sub.Status.ResolutionPhase = olmv1.PhaseSucceeded
 		sub.Status.Message = "Found 1 candidate that matches constraints"
 		sub.Status.UpgradeTo = candidates[0].Version
-		sub.Status.UpgradeAvailable = true
+		sub.Status.UpgradeSelected = true
 	default:
 		res, err := r.selectPath(ctx, *sub, candidates)
 		if err != nil {
@@ -198,7 +199,7 @@ func (r *SubscriptionReconciler) resolve(ctx context.Context, sub *olmv1.Subscri
 		sub.Status.ResolutionPhase = res.phase
 		sub.Status.Message = res.message
 		sub.Status.UpgradeTo = res.selection
-		sub.Status.UpgradeAvailable = res.selection != ""
+		sub.Status.UpgradeSelected = res.selection != ""
 	}
 	return r.Status().Update(ctx, sub)
 }
@@ -259,6 +260,12 @@ func (r *SubscriptionReconciler) selectPath(ctx context.Context, sub olmv1.Subsc
 			message: "Waiting for path selector to make selection",
 		}, nil
 	}
+	if ps.Status.Phase == olmv1.PhaseEvaluating || ps.Status.Phase == "" {
+		return &selectionResult{
+			phase:   olmv1.PhaseEvaluating,
+			message: "Waiting for path selector to make selection",
+		}, nil
+	}
 
 	res := &selectionResult{
 		selection: ps.Status.Selection,
@@ -290,6 +297,18 @@ func (r *SubscriptionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&olmv1.Subscription{}).
 		Owns(&olmv1.PathSelector{}).
+		Watches(&source.Kind{Type: &olmv1.PathSelectorClass{}}, handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []reconcile.Request {
+			subs := &olmv1.SubscriptionList{}
+			if err := r.List(context.TODO(), subs); err != nil {
+				return nil
+			}
+			reqs := []reconcile.Request{}
+			for _, item := range subs.Items {
+				key := client.ObjectKeyFromObject(&item)
+				reqs = append(reqs, reconcile.Request{NamespacedName: key})
+			}
+			return reqs
+		})).
 		Watches(&source.Kind{Type: &olmv1.Operator{}}, handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []reconcile.Request {
 			op := obj.(*olmv1.Operator)
 			subs := &olmv1.SubscriptionList{}

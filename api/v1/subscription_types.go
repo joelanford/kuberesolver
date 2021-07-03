@@ -57,6 +57,7 @@ type SubscriptionStatus struct {
 	IndexRef         *v1.ObjectReference `json:"indexReference,omitempty"`
 	Paths            *SubscriptionPaths  `json:"paths,omitempty"`
 	UpgradeAvailable bool                `json:"upgradeAvailable"`
+	UpgradeSelected  bool                `json:"upgradeSelected"`
 	UpgradeTo        string              `json:"upgradeTo,omitempty"`
 	Installed        string              `json:"installed,omitempty"`
 	ResolutionPhase  string              `json:"resolutionPhase,omitempty"`
@@ -72,8 +73,9 @@ type SubscriptionPaths struct {
 //+kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Package",type=string,JSONPath=`.spec.package`
 // +kubebuilder:printcolumn:name="Installed",type=string,JSONPath=`.status.installed`
-// +kubebuilder:printcolumn:name="Approval",type=string,JSONPath=`.status.approval`
+// +kubebuilder:printcolumn:name="Approval",type=string,JSONPath=`.spec.approval`
 // +kubebuilder:printcolumn:name="Upgrade Available",type=boolean,JSONPath=`.status.upgradeAvailable`
+// +kubebuilder:printcolumn:name="Upgrade Selected",type=boolean,JSONPath=`.status.upgradeSelected`
 // +kubebuilder:printcolumn:name="Next Version",type=string,JSONPath=`.status.upgradeTo`
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
