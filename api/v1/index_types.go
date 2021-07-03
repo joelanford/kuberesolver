@@ -54,6 +54,8 @@ type IndexStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:scope=Cluster
+//+kubebuilder:printcolumn:name="Priority",type=string,JSONPath=`.spec.priority`
+//+kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Index is the Schema for the indices API
 type Index struct {

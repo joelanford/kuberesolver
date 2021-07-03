@@ -71,13 +71,13 @@ type SubscriptionPaths struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Package",type=string,JSONPath=`.spec.package`
-// +kubebuilder:printcolumn:name="Installed",type=string,JSONPath=`.status.installed`
-// +kubebuilder:printcolumn:name="Approval",type=string,JSONPath=`.spec.approval`
-// +kubebuilder:printcolumn:name="Upgrade Available",type=boolean,JSONPath=`.status.upgradeAvailable`
-// +kubebuilder:printcolumn:name="Upgrade Selected",type=boolean,JSONPath=`.status.upgradeSelected`
-// +kubebuilder:printcolumn:name="Next Version",type=string,JSONPath=`.status.upgradeTo`
-// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+//+kubebuilder:printcolumn:name="Package",type=string,JSONPath=`.spec.package`
+//+kubebuilder:printcolumn:name="Installed",type=string,JSONPath=`.status.installed`
+//+kubebuilder:printcolumn:name="Approval",type=string,JSONPath=`.spec.approval`
+//+kubebuilder:printcolumn:name="Upgrade Available",type=boolean,JSONPath=`.status.upgradeAvailable`
+//+kubebuilder:printcolumn:name="Upgrade Selected",type=boolean,JSONPath=`.status.upgradeSelected`
+//+kubebuilder:printcolumn:name="Next Version",type=string,JSONPath=`.status.upgradeTo`
+//+kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Subscription is the Schema for the subscriptions API
 type Subscription struct {
