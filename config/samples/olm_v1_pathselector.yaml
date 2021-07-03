@@ -4,27 +4,9 @@ metadata:
   name: pathselector-sample
 spec:
   candidates:
-  - name: v1
-    properties:
-    - type: olm.version
-      value: 0.1.0
-  - name: v2
-    properties:
-    - type: olm.version
-      value: 0.2.0
-  - name: v3
-    properties:
-    - type: olm.version
-      value: 0.3.0
-  - name: v4
-    properties:
-    - type: olm.version
-      value: 0.4.0
-  - name: v5
-    properties:
-    - type: olm.version
-      value: 0.5.0
-  - name: v6
-    properties:
-    - type: olm.version
-      value: 0.6.0
+  - version: 0.1.0
+  - version: 0.2.0
+  - version: 0.3.0
+  - version: 0.4.0
+  - version: 0.5.0
+  - version: 0.6.0

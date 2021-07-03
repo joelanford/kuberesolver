@@ -18,10 +18,8 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
-	"github.com/blang/semver/v4"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -32,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	olmv1 "kuberesolver/api/v1"
+	"kuberesolver/internal/pathselector"
 )
 
 // PathSelectorReconciler reconciles a PathSelector object
@@ -55,7 +54,7 @@ type PathSelectorReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
 func (r *PathSelectorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("PathSelector", req.NamespacedName)
+	log := r.Log.WithValues("pathSelector", req.NamespacedName)
 	log.Info("reconciling")
 
 	ps := &olmv1.PathSelector{}
@@ -63,37 +62,26 @@ func (r *PathSelectorReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	var psc *olmv1.PathSelectorClass
-	if ps.Spec.PathSelectorClassName != "" {
-		pscKey := types.NamespacedName{Name: ps.Spec.PathSelectorClassName}
-		if err := r.Get(ctx, pscKey, psc); err != nil {
-			ps.Status.Phase = olmv1.PhaseFailed
-			ps.Status.Message = err.Error()
+	psc, err := r.getPathSelectorClass(ctx, ps.Spec.PathSelectorClassName)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if psc == nil {
+		newStat := olmv1.PathSelectorStatus{
+			Message: "Path selector class not specified and no default path selector class present on cluster",
+			Phase:   olmv1.PhaseFailed,
+		}
+		if !reflect.DeepEqual(ps.Status, newStat) {
+			ps.Status = newStat
 			return ctrl.Result{}, r.Status().Update(ctx, ps)
 		}
-	} else {
-		pscs := &olmv1.PathSelectorClassList{}
-		if err := r.List(ctx, pscs); err != nil {
-			ps.Status.Phase = olmv1.PhaseFailed
-			ps.Status.Message = err.Error()
-			return ctrl.Result{}, r.Status().Update(ctx, ps)
-		}
-		for _, item := range pscs.Items {
-			fmt.Println(item.Annotations[olmv1.AnnotationDefaultPathSelectorClass])
-			if item.Annotations[olmv1.AnnotationDefaultPathSelectorClass] == "true" {
-				psc = &item
-				break
-			}
-		}
-		if psc == nil {
-			ps.Status.Phase = olmv1.PhaseFailed
-			ps.Status.Message = "pathSelectorClassName not defined and no default PathSelectorClass found"
-			return ctrl.Result{}, r.Status().Update(ctx, ps)
-		}
+		return ctrl.Result{}, nil
 	}
 
-	controller, ok := r.pathSelectorControllers()[psc.Spec.Controller]
+	controller, ok := pathselector.Controllers[psc.Spec.Controller]
 	if !ok {
+		// If the controller specified by the psc is not known to us, stop
+		// reconciling. This isn't our path selector to reconcile.
 		return ctrl.Result{}, nil
 	}
 	newStat := controller.Select(ctx, ps.Spec.Candidates, psc.Spec.Parameters)
@@ -102,6 +90,37 @@ func (r *PathSelectorReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, r.Status().Update(ctx, ps)
 	}
 	return ctrl.Result{}, nil
+}
+
+func (r *PathSelectorReconciler) getPathSelectorClass(ctx context.Context, pscName string) (*olmv1.PathSelectorClass, error) {
+	// If the path selector class name is non-empty, get and return it
+	if pscName != "" {
+		psc := &olmv1.PathSelectorClass{}
+		pscKey := types.NamespacedName{Name: pscName}
+		if err := r.Get(ctx, pscKey, psc); err != nil {
+			return nil, err
+		}
+		return psc, nil
+	}
+
+	// Otherwise, we'll only reconcile this path selector if one of the path
+	// selector classes that we own is set as the default.
+	pscList := &olmv1.PathSelectorClassList{}
+	if err := r.List(ctx, pscList); err != nil {
+		return nil, err
+	}
+	for _, psc := range pscList.Items {
+		if v, ok := psc.Annotations[olmv1.AnnotationDefaultPathSelectorClass]; ok && v == "true" {
+			return &psc, nil
+		}
+	}
+
+	// If the path selector does not specify a path selector class and there is
+	// not a default path selector class, no path selector controller will
+	// reconcile this path selector. This is not an error condition, but there
+	// also isn't a PSC to return. Callers should update the PS status to inform
+	// the PS creator about this condition.
+	return nil, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -126,42 +145,6 @@ func (r *PathSelectorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *PathSelectorReconciler) pathSelectorControllers() map[string]PathSelectorController {
-	return map[string]PathSelectorController{
-		"olm.operatorframework.io/highest-semver": &highestSemverController{},
-	}
-}
-
 type PathSelectorController interface {
 	Select(context.Context, []olmv1.Candidate, *olmv1.PathSelectorClassParameters) olmv1.PathSelectorStatus
-}
-
-type highestSemverController struct{}
-
-func (c highestSemverController) Select(_ context.Context, candidates []olmv1.Candidate, pscp *olmv1.PathSelectorClassParameters) olmv1.PathSelectorStatus {
-	var maxVersion *semver.Version
-	for _, c := range candidates {
-		version, err := semver.Parse(c.Version)
-		if err != nil {
-			return olmv1.PathSelectorStatus{
-				Phase:   olmv1.PhaseFailed,
-				Message: fmt.Sprintf("parse candidate version %q: %v", c.Version, err),
-			}
-		}
-		if maxVersion == nil || maxVersion.LT(version) {
-			maxVersion = &version
-		}
-	}
-
-	if maxVersion == nil {
-		return olmv1.PathSelectorStatus{
-			Phase:   olmv1.PhaseFailed,
-			Message: "no versioned candidates exist",
-		}
-	}
-
-	return olmv1.PathSelectorStatus{
-		Selection: maxVersion.String(),
-		Phase:     olmv1.PhaseSucceeded,
-	}
 }
