@@ -18,14 +18,11 @@ package controllers
 
 import (
 	"context"
-	"fmt"
-	"reflect"
 	"sort"
 
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -36,13 +33,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	olmv1 "kuberesolver/api/v1"
+	"kuberesolver/internal/pathselector"
+	"kuberesolver/internal/resolver"
+	"kuberesolver/internal/util"
 )
 
 // SubscriptionReconciler reconciles a Subscription object
 type SubscriptionReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	NewResolverFunc func(subscription olmv1.Subscription) resolver.Resolver
+	Log             logr.Logger
+	Scheme          *runtime.Scheme
 }
 
 //+kubebuilder:rbac:groups=olm.operatorframework.io,resources=subscriptions,verbs=get;list;watch;create;update;patch;delete
@@ -94,7 +95,25 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, r.updateStatus(ctx, sub, updatedStatus)
 	}
 
-	return ctrl.Result{}, r.resolve(ctx, sub, *pkg, updatedStatus)
+	resreq := resolver.Request{
+		Package:    *pkg,
+		Constraint: sub.Spec.Constraint,
+		Installed:  operator,
+	}
+	resres := r.NewResolverFunc(*sub).Resolve(ctx, resreq)
+
+	updatedStatus.Paths = &olmv1.SubscriptionPaths{}
+	updatedStatus.Paths.All = util.BundlesToCandidates(pkg.Bundles)
+	updatedStatus.Paths.Filtered = resres.Candidates
+	updatedStatus.ResolutionPhase = resres.Phase
+	updatedStatus.Message = resres.Message
+	updatedStatus.UpgradeSelected = false
+	updatedStatus.UpgradeAvailable = len(resres.Candidates) > 0
+	if resres.Selection != nil {
+		updatedStatus.UpgradeTo = resres.Selection.Version
+		updatedStatus.UpgradeSelected = true
+	}
+	return ctrl.Result{}, r.updateStatus(ctx, sub, updatedStatus)
 }
 
 func indexRef(idx olmv1.Index) *v1.ObjectReference {
@@ -142,32 +161,6 @@ func (r *SubscriptionReconciler) getIndexAndPackage(ctx context.Context, sub olm
 	return nil, nil, nil
 }
 
-func allCandidateBundles(pkg olmv1.Package, installed string) []olmv1.Bundle {
-	bundles := pkg.Bundles
-	if installed != "" {
-		bundles = []olmv1.Bundle{}
-		for _, b := range pkg.Bundles {
-			for _, from := range b.UpgradesFrom {
-				if from == installed {
-					bundles = append(bundles, b)
-				}
-			}
-		}
-	}
-	return bundles
-}
-
-func constrainCandidateBundles(bundles []olmv1.Bundle, constraint *olmv1.Constraint) ([]olmv1.Bundle, error) {
-	if constraint != nil {
-		var err error
-		bundles, err = constraint.Apply(bundles)
-		if err != nil {
-			return nil, fmt.Errorf("apply subscription constraint to candidates: %v", err)
-		}
-	}
-	return bundles, nil
-}
-
 func (r *SubscriptionReconciler) updateStatus(ctx context.Context, sub *olmv1.Subscription, status olmv1.SubscriptionStatus) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		if err := r.Get(ctx, client.ObjectKeyFromObject(sub), sub); err != nil {
@@ -178,60 +171,6 @@ func (r *SubscriptionReconciler) updateStatus(ctx context.Context, sub *olmv1.Su
 	})
 }
 
-func (r *SubscriptionReconciler) resolve(ctx context.Context, sub *olmv1.Subscription, pkg olmv1.Package, updatedStatus olmv1.SubscriptionStatus) error {
-	updatedStatus.Paths = &olmv1.SubscriptionPaths{}
-
-	all := allCandidateBundles(pkg, sub.Status.Installed)
-	updatedStatus.Paths.All = bundlesToCandidates(all...)
-
-	filtered, err := constrainCandidateBundles(all, sub.Spec.Constraint)
-	if err != nil {
-		updatedStatus.Message = fmt.Sprintf("Failed to apply constraint: %v", err)
-		updatedStatus.ResolutionPhase = olmv1.PhaseFailed
-		return r.updateStatus(ctx, sub, updatedStatus)
-	}
-
-	candidates := bundlesToCandidates(filtered...)
-	updatedStatus.Paths.Filtered = candidates
-	updatedStatus.UpgradeAvailable = len(candidates) > 0
-
-	switch len(candidates) {
-	case 0:
-		updatedStatus.ResolutionPhase = olmv1.PhaseSucceeded
-		updatedStatus.Message = "No upgrades available"
-	case 1:
-		updatedStatus.ResolutionPhase = olmv1.PhaseSucceeded
-		updatedStatus.Message = "Found 1 candidate that matches constraints"
-		updatedStatus.UpgradeTo = candidates[0].Version
-		updatedStatus.UpgradeSelected = true
-	default:
-		res, err := r.selectPath(ctx, *sub, candidates)
-		if err != nil {
-			updatedStatus.Message = fmt.Sprintf("Failed to select upgrade path: %v", err)
-			updatedStatus.ResolutionPhase = olmv1.PhaseFailed
-		} else {
-			updatedStatus.ResolutionPhase = res.phase
-			updatedStatus.Message = res.message
-			updatedStatus.UpgradeTo = res.selection
-			updatedStatus.UpgradeSelected = res.selection != ""
-		}
-
-	}
-	return r.updateStatus(ctx, sub, updatedStatus)
-}
-
-func bundlesToCandidates(bundles ...olmv1.Bundle) []olmv1.Candidate {
-	out := []olmv1.Candidate{}
-	for _, b := range bundles {
-		out = append(out, olmv1.Candidate{
-			Version:  b.Version,
-			Channels: b.Channels,
-			Labels:   b.Labels,
-		})
-	}
-	return out
-}
-
 type selectionResult struct {
 	selection string
 	phase     string
@@ -239,77 +178,15 @@ type selectionResult struct {
 	requeue   bool
 }
 
-func (r *SubscriptionReconciler) selectPath(ctx context.Context, sub olmv1.Subscription, candidates []olmv1.Candidate) (*selectionResult, error) {
-	ps, err := r.desiredPathSelector(sub, candidates)
-	if err != nil {
-		return nil, err
-	}
-	psKey := client.ObjectKeyFromObject(ps)
-	createErr := r.Create(ctx, ps)
-	if createErr == nil {
-		return &selectionResult{
-			phase:   olmv1.PhaseEvaluating,
-			message: "Waiting for path selector to make selection",
-		}, nil
-	}
-	if !apierrors.IsAlreadyExists(createErr) {
-		return nil, createErr
-	}
-
-	if err := retry.OnError(retry.DefaultRetry, apierrors.IsNotFound, func() error {
-		return r.Get(ctx, psKey, ps)
-	}); err != nil {
-		return nil, err
-	}
-
-	desired, err := r.desiredPathSelector(sub, candidates)
-	if err != nil {
-		return nil, err
-	}
-	if !reflect.DeepEqual(ps.Spec, desired.Spec) {
-		ps.Spec = desired.Spec
-		if err := r.Update(ctx, ps); err != nil {
-			return nil, err
-		}
-		return &selectionResult{
-			phase:   olmv1.PhaseEvaluating,
-			message: "Waiting for path selector to make selection",
-		}, nil
-	}
-	if ps.Status.Phase == olmv1.PhaseEvaluating || ps.Status.Phase == "" {
-		return &selectionResult{
-			phase:   olmv1.PhaseEvaluating,
-			message: "Waiting for path selector to make selection",
-		}, nil
-	}
-
-	res := &selectionResult{
-		selection: ps.Status.Selection,
-		phase:     ps.Status.Phase,
-		message:   ps.Status.Message,
-	}
-	return res, nil
-}
-
-func (r *SubscriptionReconciler) desiredPathSelector(sub olmv1.Subscription, candidates []olmv1.Candidate) (*olmv1.PathSelector, error) {
-	ps := &olmv1.PathSelector{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: sub.Namespace,
-			Name:      sub.Name,
-		},
-		Spec: olmv1.PathSelectorSpec{
-			PathSelectorClassName: sub.Spec.PathSelectorClassName,
-			Candidates:            candidates,
-		},
-	}
-	if err := ctrl.SetControllerReference(&sub, ps, r.Scheme); err != nil {
-		return nil, err
-	}
-	return ps, nil
-}
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *SubscriptionReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	r.NewResolverFunc = func(subscription olmv1.Subscription) resolver.Resolver {
+		return resolver.NewResolver(pathselector.ClusterSelector{
+			Client:       mgr.GetClient(),
+			Scheme:       mgr.GetScheme(),
+			Subscription: subscription,
+		})
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&olmv1.Subscription{}).
 		Owns(&olmv1.PathSelector{}).

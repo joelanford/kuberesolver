@@ -88,9 +88,31 @@ spec:
                   Failed'
                 type: string
               selection:
-                description: Selection is the name of the candidate chosen by a PathSelector
-                  controller.
-                type: string
+                description: Selection is the candidate chosen by a PathSelector controller.
+                properties:
+                  channels:
+                    description: Channels is a list of channels that the candidate
+                      is a member of. The PathSelector may evaluate these channels
+                      to make a selection.
+                    items:
+                      type: string
+                    type: array
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: Labels is a map of key/value pairs  that describe
+                      the candidate. The PathSelector may evaluate these labels to
+                      make a selection.
+                    type: object
+                  version:
+                    description: Version is the version of the candidate within the
+                      global set of all candidates of a particular package unique
+                      identifier for a candidate. Uniqueness is determined by the
+                      context of clients of the PathSelector API.
+                    type: string
+                required:
+                - version
+                type: object
             type: object
         type: object
     served: true

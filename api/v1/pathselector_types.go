@@ -37,8 +37,8 @@ type PathSelectorSpec struct {
 
 // PathSelectorStatus defines the observed state of PathSelector
 type PathSelectorStatus struct {
-	// Selection is the name of the candidate chosen by a PathSelector controller.
-	Selection string `json:"selection,omitempty"`
+	// Selection is the candidate chosen by a PathSelector controller.
+	Selection *Candidate `json:"selection,omitempty"`
 
 	// Phase is a simple CamelCase string that describes the state of the
 	// path selection. Possibilities are: Evaluating, Succeeded, Failed

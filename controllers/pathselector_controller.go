@@ -84,7 +84,14 @@ func (r *PathSelectorReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// reconciling. This isn't our path selector to reconcile.
 		return ctrl.Result{}, nil
 	}
-	newStat := controller.Select(ctx, ps.Spec.Candidates, psc.Spec.Parameters)
+	res := controller.Select(ctx, ps.Spec.Candidates, psc.Spec.Parameters)
+	newStat := olmv1.PathSelectorStatus{
+		Phase:   res.Phase,
+		Message: res.Message,
+	}
+	if res.Selection != nil {
+		newStat.Selection = res.Selection
+	}
 	if !reflect.DeepEqual(ps.Status, newStat) {
 		ps.Status = newStat
 		return ctrl.Result{}, r.Status().Update(ctx, ps)
