@@ -110,7 +110,7 @@ func (r *PathSelectorReconciler) getPathSelectorClass(ctx context.Context, pscNa
 		return nil, err
 	}
 	for _, psc := range pscList.Items {
-		if v, ok := psc.Annotations[olmv1.AnnotationDefaultPathSelectorClass]; ok && v == "true" {
+		if psc.IsDefault() {
 			return &psc, nil
 		}
 	}

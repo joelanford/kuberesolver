@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	AnnotationDefaultPathSelectorClass = "pathselectorclass.olm.operatorframework.io/is-default-class"
+	annotationDefaultPathSelectorClass = "pathselectorclass.olm.operatorframework.io/is-default-class"
 )
 
 // PathSelectorClassSpec defines the desired state of PathSelectorClass
@@ -64,6 +64,10 @@ type PathSelectorClass struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec PathSelectorClassSpec `json:"spec,omitempty"`
+}
+
+func (psc PathSelectorClass) IsDefault() bool {
+	return psc.Annotations[annotationDefaultPathSelectorClass] == "true"
 }
 
 //+kubebuilder:object:root=true
