@@ -27,8 +27,8 @@ import (
 // IndexSpec defines the desired state of Index
 type IndexSpec struct {
 	// The priority of this index when choosing a package that exists in multiple indices. Lower numbers mean
-	// higher priority (e.g. packages in an index with priority 0 will be chosen before packages in an index
-	// with priority 10).
+	// lower priority. For example, packages in an index with priority 0 (or unset priority) are the lowest priority,
+	// and packages with increasing values are higher and higher priority.
 	Priority uint      `json:"priority"`
 	Packages []Package `json:"packages,omitempty"`
 }

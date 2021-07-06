@@ -17,7 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -54,14 +53,13 @@ type Constraint struct {
 
 // SubscriptionStatus defines the observed state of Subscription
 type SubscriptionStatus struct {
-	IndexRef         *v1.ObjectReference `json:"indexReference,omitempty"`
-	Paths            *SubscriptionPaths  `json:"paths,omitempty"`
-	UpgradeAvailable bool                `json:"upgradeAvailable"`
-	UpgradeSelected  bool                `json:"upgradeSelected"`
-	UpgradeTo        string              `json:"upgradeTo,omitempty"`
-	Installed        string              `json:"installed,omitempty"`
-	ResolutionPhase  string              `json:"resolutionPhase,omitempty"`
-	Message          string              `json:"message,omitempty"`
+	Paths            *SubscriptionPaths `json:"paths,omitempty"`
+	UpgradeAvailable bool               `json:"upgradeAvailable"`
+	UpgradeSelected  bool               `json:"upgradeSelected"`
+	UpgradeTo        string             `json:"upgradeTo,omitempty"`
+	Installed        string             `json:"installed,omitempty"`
+	ResolutionPhase  string             `json:"resolutionPhase,omitempty"`
+	Message          string             `json:"message,omitempty"`
 }
 
 type SubscriptionPaths struct {

@@ -1,9 +1,10 @@
+---
 apiVersion: olm.operatorframework.io/v1
 kind: Index
 metadata:
-  name: index-sample
+  name: index-1000
 spec:
-  priority: 0
+  priority: 1000
   packages:
     - name: foo
       bundles:
@@ -51,4 +52,36 @@ spec:
           labels:
             major: "0"
             minor: "0.6"
-            olm.channels: "stable"
+---
+apiVersion: olm.operatorframework.io/v1
+kind: Index
+metadata:
+  name: index-0
+spec:
+  priority: 0
+  packages:
+    - name: foo
+      bundles:
+        - version: 0.1.0
+          channels:
+          - alpha
+        - version: 0.1.1
+          channels:
+          - alpha
+        - version: 0.2.0
+          channels:
+          - alpha
+        - version: 0.3.0
+          channels:
+          - alpha
+        - version: 0.4.0
+          channels:
+          - alpha
+          - beta
+        - version: 0.5.0
+          channels:
+          - beta
+          - stable
+        - version: 0.6.0
+          channels:
+          - stable

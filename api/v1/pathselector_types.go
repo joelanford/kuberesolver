@@ -78,6 +78,9 @@ type Candidate struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="Selection",type=string,JSONPath=`.status.selection.version`
+//+kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
+//+kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // PathSelector is the Schema for the pathselectors API
 type PathSelector struct {
