@@ -5,6 +5,10 @@ metadata:
 spec:
   approval: Automatic
   constraint:
+    all:
+    - selector:
+        matchLabels:
+          minor: "0.1"
     any:
     - channel: alpha
   package: foo
