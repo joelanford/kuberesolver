@@ -204,14 +204,17 @@ func (r *SubscriptionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&olmv1.Subscription{}).
 		Owns(&olmv1.PathSelector{}).
 		Watches(&source.Kind{Type: &olmv1.PathSelectorClass{}}, handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []reconcile.Request {
+			psc := obj.(*olmv1.PathSelectorClass)
 			subs := &olmv1.SubscriptionList{}
 			if err := r.List(context.TODO(), subs); err != nil {
 				return nil
 			}
 			reqs := []reconcile.Request{}
 			for _, item := range subs.Items {
-				key := client.ObjectKeyFromObject(&item)
-				reqs = append(reqs, reconcile.Request{NamespacedName: key})
+				if (psc.IsDefault() && item.Spec.PathSelectorClassName == "") || (psc.Name == item.Spec.PathSelectorClassName) {
+					key := client.ObjectKeyFromObject(&item)
+					reqs = append(reqs, reconcile.Request{NamespacedName: key})
+				}
 			}
 			return reqs
 		})).
