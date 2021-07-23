@@ -92,6 +92,10 @@ spec:
                 description: Message is an arbitrary string that provides further
                   detail and context about the current phase.
                 type: string
+              pathSelectorClassName:
+                description: PathSelectorClassName is the name of the PathSelectorClass
+                  that reconciled this PathSelector.
+                type: string
               phase:
                 description: 'Phase is a simple CamelCase string that describes the
                   state of the path selection. Possibilities are: Evaluating, Succeeded,

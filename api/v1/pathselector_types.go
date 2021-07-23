@@ -37,6 +37,10 @@ type PathSelectorSpec struct {
 
 // PathSelectorStatus defines the observed state of PathSelector
 type PathSelectorStatus struct {
+	// PathSelectorClassName is the name of the PathSelectorClass that
+	// reconciled this PathSelector.
+	PathSelectorClassName string `json:"pathSelectorClassName,omitempty"`
+
 	// Selection is the candidate chosen by a PathSelector controller.
 	Selection *Candidate `json:"selection,omitempty"`
 

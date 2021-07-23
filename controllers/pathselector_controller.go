@@ -23,6 +23,7 @@ import (
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -86,17 +87,27 @@ func (r *PathSelectorReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	res := controller.Select(ctx, ps.Spec.Candidates, psc.Spec.Parameters)
 	newStat := olmv1.PathSelectorStatus{
-		Phase:   res.Phase,
-		Message: res.Message,
+		PathSelectorClassName: psc.Name,
+		Phase:                 res.Phase,
+		Message:               res.Message,
 	}
 	if res.Selection != nil {
 		newStat.Selection = res.Selection
 	}
 	if !reflect.DeepEqual(ps.Status, newStat) {
-		ps.Status = newStat
-		return ctrl.Result{}, r.Status().Update(ctx, ps)
+		return ctrl.Result{}, r.updateStatus(ctx, ps, newStat)
 	}
 	return ctrl.Result{}, nil
+}
+
+func (r *PathSelectorReconciler) updateStatus(ctx context.Context, ps *olmv1.PathSelector, status olmv1.PathSelectorStatus) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err := r.Get(ctx, client.ObjectKeyFromObject(ps), ps); err != nil {
+			return err
+		}
+		ps.Status = status
+		return r.Status().Update(ctx, ps)
+	})
 }
 
 func (r *PathSelectorReconciler) getPathSelectorClass(ctx context.Context, pscName string) (*olmv1.PathSelectorClass, error) {
