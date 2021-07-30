@@ -98,8 +98,10 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	resres := r.NewResolverFunc(*sub).Resolve(ctx, resreq)
 
+	possibleBundles := possible(pkg.Bundles, operator.Spec.Version)
+
 	updatedStatus.Paths = &olmv1.SubscriptionPaths{}
-	updatedStatus.Paths.All = util.BundlesToCandidates(pkg.Bundles)
+	updatedStatus.Paths.All = util.BundlesToCandidates(possibleBundles)
 	updatedStatus.Paths.Filtered = resres.Candidates
 	updatedStatus.ResolutionPhase = resres.Phase
 	updatedStatus.Message = resres.Message
@@ -246,4 +248,20 @@ func (r *SubscriptionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return reqs
 		})).
 		Complete(r)
+}
+
+func possible(all []olmv1.Bundle, installed string) []olmv1.Bundle {
+	if installed == "" {
+		return all
+	}
+	filtered := []olmv1.Bundle{}
+	for _, b := range all {
+		for _, uf := range b.UpgradesFrom {
+			if uf == installed {
+				filtered = append(filtered, b)
+				break
+			}
+		}
+	}
+	return filtered
 }
