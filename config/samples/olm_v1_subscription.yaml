@@ -6,9 +6,7 @@ spec:
   approval: Automatic
   constraint:
     all:
-    - selector:
-        matchLabels:
-          minor: "0.1"
+    - versionRange: ">=0.1.0 <0.2.0"
     any:
     - channel: alpha
   package: foo

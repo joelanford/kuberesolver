@@ -170,7 +170,7 @@ func (r *SubscriptionReconciler) getPackage(ctx context.Context, sub olmv1.Subsc
 	}
 
 	// Now that the bundles have been added and deduplicated from each index and
-	// package, add them to the generated pacakge.
+	// package, add them to the generated package.
 	for _, b := range bundleMap {
 		pkg.Bundles = append(pkg.Bundles, b)
 	}

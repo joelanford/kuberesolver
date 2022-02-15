@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"github.com/blang/semver/v4"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -44,11 +45,12 @@ type SubscriptionSpec struct {
 }
 
 type Constraint struct {
-	All      []Constraint          `json:"all,omitempty"`
-	Any      []Constraint          `json:"any,omitempty"`
-	Negate   *bool                 `json:"negate,omitempty"`
-	Channel  string                `json:"channel,omitempty"`
-	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+	All          []Constraint          `json:"all,omitempty"`
+	Any          []Constraint          `json:"any,omitempty"`
+	Negate       *bool                 `json:"negate,omitempty"`
+	Channel      string                `json:"channel,omitempty"`
+	VersionRange string                `json:"versionRange,omitempty"`
+	Selector     *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
 // SubscriptionStatus defines the observed state of Subscription
@@ -126,6 +128,9 @@ func (c Constraint) Match(b Bundle) (bool, error) {
 	if len(c.Channel) > 0 {
 		matchFuncs = append(matchFuncs, c.matchChannel)
 	}
+	if len(c.VersionRange) > 0 {
+		matchFuncs = append(matchFuncs, c.matchVersionRange)
+	}
 	if c.Selector != nil {
 		matchFuncs = append(matchFuncs, c.matchSelector)
 	}
@@ -169,6 +174,18 @@ func (c Constraint) matchChannel(b Bundle) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func (c Constraint) matchVersionRange(b Bundle) (bool, error) {
+	vr, err := semver.ParseRange(c.VersionRange)
+	if err != nil {
+		return false, err
+	}
+	bv, err := semver.Parse(b.Version)
+	if err != nil {
+		return false, err
+	}
+	return vr(bv), nil
 }
 
 func (c Constraint) matchSelector(b Bundle) (bool, error) {

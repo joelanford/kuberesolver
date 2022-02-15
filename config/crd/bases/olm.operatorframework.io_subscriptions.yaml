@@ -123,6 +123,8 @@ spec:
                           "value". The requirements are ANDed.
                         type: object
                     type: object
+                  versionRange:
+                    type: string
                 type: object
               index:
                 type: string

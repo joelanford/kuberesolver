@@ -20,6 +20,10 @@
                      type: array
                    channel:
                      type: string
+                   versionRange:
+                     type: string
+                   versionRange:
+                     type: string
                    negate:
                      type: boolean
                    selector:
@@ -69,6 +73,8 @@
                      type: array
                    channel:
                      type: string
+                   versionRange:
+                     type: string
                    negate:
                      type: boolean
                    selector:
@@ -104,6 +110,8 @@
                  type: object
               type: array
             channel:
+              type: string
+            versionRange:
               type: string
             negate:
               type: boolean
@@ -157,6 +165,8 @@
                      type: array
                    channel:
                      type: string
+                   versionRange:
+                     type: string
                    negate:
                      type: boolean
                    selector:
@@ -206,6 +216,8 @@
                      type: array
                    channel:
                      type: string
+                   versionRange:
+                     type: string
                    negate:
                      type: boolean
                    selector:
@@ -242,6 +254,8 @@
               type: array
             channel:
               type: string
+            versionRange:
+              type: string
             negate:
               type: boolean
             selector:
@@ -277,6 +291,8 @@
           type: object
         type: array
       channel:
+        type: string
+      versionRange:
         type: string
       negate:
         type: boolean
@@ -335,6 +351,8 @@
                      type: array
                    channel:
                      type: string
+                   versionRange:
+                     type: string
                    negate:
                      type: boolean
                    selector:
@@ -384,6 +402,8 @@
                      type: array
                    channel:
                      type: string
+                   versionRange:
+                     type: string
                    negate:
                      type: boolean
                    selector:
@@ -419,6 +439,8 @@
                  type: object
               type: array
             channel:
+              type: string
+            versionRange:
               type: string
             negate:
               type: boolean
@@ -472,6 +494,8 @@
                      type: array
                    channel:
                      type: string
+                   versionRange:
+                     type: string
                    negate:
                      type: boolean
                    selector:
@@ -521,6 +545,8 @@
                      type: array
                    channel:
                      type: string
+                   versionRange:
+                     type: string
                    negate:
                      type: boolean
                    selector:
@@ -557,6 +583,8 @@
               type: array
             channel:
               type: string
+            versionRange:
+              type: string
             negate:
               type: boolean
             selector:
@@ -592,6 +620,8 @@
           type: object
         type: array
       channel:
+        type: string
+      versionRange:
         type: string
       negate:
         type: boolean
