@@ -1,7 +1,7 @@
 apiVersion: olm.operatorframework.io/v1
 kind: Subscription
 metadata:
-  name: foo
+  name: app-operator
 spec:
   approval: Automatic
   constraint:
@@ -9,4 +9,4 @@ spec:
     - versionRange: ">=0.1.0 <0.2.0"
     any:
     - channel: alpha
-  package: foo
+  package: app-operator

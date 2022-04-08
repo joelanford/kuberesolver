@@ -1,7 +1,7 @@
 apiVersion: olm.operatorframework.io/v1
 kind: Operator
 metadata:
-  name: foo
+  name: app-operator
 spec:
-  package: foo
+  package: app-operator
   version: 0.1.0

@@ -39,6 +39,7 @@ type Package struct {
 }
 
 type Bundle struct {
+	Image        string     `json:"image"`
 	Version      string     `json:"version"`
 	UpgradesFrom []string   `json:"upgradesFrom,omitempty"`
 	Channels     []string   `json:"channels,omitempty"`

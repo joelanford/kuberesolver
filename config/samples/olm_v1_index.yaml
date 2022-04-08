@@ -2,68 +2,41 @@
 apiVersion: olm.operatorframework.io/v1
 kind: Index
 metadata:
-  name: index-1000
+  name: app-operator-index
 spec:
   priority: 1000
   packages:
-    - name: foo
+    - name: app-operator
       bundles:
         - version: 0.1.0
+          image: quay.io/joelanford/app-operator:bundle-v0.1.0
           channels:
           - alpha
           upgradesFrom: []
         - version: 0.2.0
+          image: quay.io/joelanford/app-operator:bundle-v0.2.0
           channels:
           - alpha
           upgradesFrom: [0.1.0]
         - version: 0.3.0
+          image: quay.io/joelanford/app-operator:bundle-v0.3.0
           channels:
           - alpha
           upgradesFrom: [0.2.0]
         - version: 0.4.0
+          image: quay.io/joelanford/app-operator:bundle-v0.4.0
           channels:
           - alpha
           - beta
           upgradesFrom: [0.1.0]
         - version: 0.5.0
+          image: quay.io/joelanford/app-operator:bundle-v0.5.0
           channels:
           - beta
           - stable
           upgradesFrom: [0.3.0, 0.4.0]
         - version: 0.6.0
+          image: quay.io/joelanford/app-operator:bundle-v0.6.0
           channels:
           - stable
           upgradesFrom: [0.5.0]
----
-apiVersion: olm.operatorframework.io/v1
-kind: Index
-metadata:
-  name: index-0
-spec:
-  priority: 0
-  packages:
-    - name: foo
-      bundles:
-        - version: 0.1.0
-          channels:
-          - alpha
-        - version: 0.1.1
-          channels:
-          - alpha
-        - version: 0.2.0
-          channels:
-          - alpha
-        - version: 0.3.0
-          channels:
-          - alpha
-        - version: 0.4.0
-          channels:
-          - alpha
-          - beta
-        - version: 0.5.0
-          channels:
-          - beta
-          - stable
-        - version: 0.6.0
-          channels:
-          - stable

@@ -159,6 +159,9 @@ spec:
                           items:
                             type: string
                           type: array
+                        image:
+                          description: Image is the bundle image for this candidate.
+                          type: string
                         labels:
                           additionalProperties:
                             type: string
@@ -173,6 +176,7 @@ spec:
                             by the context of clients of the PathSelector API.
                           type: string
                       required:
+                      - image
                       - version
                       type: object
                     type: array
@@ -190,6 +194,9 @@ spec:
                           items:
                             type: string
                           type: array
+                        image:
+                          description: Image is the bundle image for this candidate.
+                          type: string
                         labels:
                           additionalProperties:
                             type: string
@@ -204,6 +211,7 @@ spec:
                             by the context of clients of the PathSelector API.
                           type: string
                       required:
+                      - image
                       - version
                       type: object
                     type: array

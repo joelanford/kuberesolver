@@ -18,10 +18,13 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
 	"github.com/go-logr/logr"
+	rukpakv1alpha1 "github.com/operator-framework/rukpak/api/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -67,18 +70,17 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	operatorKey := types.NamespacedName{
-		Namespace: sub.Namespace,
-		Name:      sub.Spec.Package,
+	bundleInstanceKey := types.NamespacedName{
+		Name: sub.Spec.Package,
 	}
-	operator := &olmv1.Operator{}
-	if err := r.Get(ctx, operatorKey, operator); err != nil {
+	bundleInstance := &rukpakv1alpha1.BundleInstance{}
+	if err := r.Get(ctx, bundleInstanceKey, bundleInstance); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 	}
 	updatedStatus := olmv1.SubscriptionStatus{
-		Installed: operator.Spec.Version,
+		Installed: bundleInstance.Status.InstalledBundleName,
 	}
 
 	pkg, err := r.getPackage(ctx, *sub)
@@ -94,11 +96,11 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	resreq := resolver.Request{
 		Package:    *pkg,
 		Constraint: sub.Spec.Constraint,
-		Installed:  operator,
+		Installed:  bundleInstance,
 	}
 	resres := r.NewResolverFunc(*sub).Resolve(ctx, resreq)
 
-	possibleBundles := possible(pkg.Bundles, operator.Spec.Version)
+	possibleBundles := possible(pkg, bundleInstance.Status.InstalledBundleName)
 
 	updatedStatus.Paths = &olmv1.SubscriptionPaths{}
 	updatedStatus.Paths.All = util.BundlesToCandidates(possibleBundles)
@@ -110,6 +112,61 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if resres.Selection != nil {
 		updatedStatus.UpgradeTo = resres.Selection.Version
 		updatedStatus.UpgradeSelected = true
+
+		bundle := &rukpakv1alpha1.Bundle{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("%s-v%s", resreq.Package.Name, resres.Selection.Version),
+			},
+			Spec: rukpakv1alpha1.BundleSpec{
+				ProvisionerClassName: "core.rukpak.io/plain",
+				Source: rukpakv1alpha1.BundleSource{
+					Type: rukpakv1alpha1.SourceTypeImage,
+					Image: &rukpakv1alpha1.ImageSource{
+						Ref: resres.Selection.Image,
+					},
+				},
+			},
+		}
+		if err := r.Create(ctx, bundle); err != nil && !apierrors.IsAlreadyExists(err) {
+			return ctrl.Result{}, err
+		}
+
+		bundleInstance := &rukpakv1alpha1.BundleInstance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: resreq.Package.Name,
+			},
+			Spec: rukpakv1alpha1.BundleInstanceSpec{
+				ProvisionerClassName: "core.rukpak.io/plain",
+				BundleName:           bundle.Name,
+			},
+		}
+		err := r.Get(ctx, client.ObjectKeyFromObject(bundleInstance), bundleInstance)
+		if err != nil {
+			if !apierrors.IsNotFound(err) {
+				return ctrl.Result{}, err
+			}
+			if err := r.Create(ctx, bundleInstance); err != nil {
+				return ctrl.Result{}, err
+			}
+		} else {
+			oldBundleName := bundleInstance.Spec.BundleName
+			bundleInstance.Spec.BundleName = bundle.Name
+			bundleInstance.Spec.ProvisionerClassName = "core.rukpak.io/plain"
+			if err := r.Update(ctx, bundleInstance); err != nil {
+				return ctrl.Result{}, err
+			}
+			if oldBundleName != bundle.Name {
+				deleteBundle := &rukpakv1alpha1.Bundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: oldBundleName,
+					},
+				}
+				if err := r.Delete(ctx, deleteBundle); client.IgnoreNotFound(err) != nil {
+					return ctrl.Result{}, err
+				}
+			}
+		}
+
 	}
 	return ctrl.Result{}, r.updateStatus(ctx, sub, updatedStatus)
 }
@@ -220,15 +277,15 @@ func (r *SubscriptionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			}
 			return reqs
 		})).
-		Watches(&source.Kind{Type: &olmv1.Operator{}}, handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []reconcile.Request {
-			op := obj.(*olmv1.Operator)
+		Watches(&source.Kind{Type: &rukpakv1alpha1.BundleInstance{}}, handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []reconcile.Request {
+			op := obj.(*rukpakv1alpha1.BundleInstance)
 			subs := &olmv1.SubscriptionList{}
 			if err := r.List(context.TODO(), subs); err != nil {
 				return nil
 			}
 			reqs := []reconcile.Request{}
 			for _, item := range subs.Items {
-				if item.Spec.Package == op.Spec.Package {
+				if item.Spec.Package == op.Name {
 					key := client.ObjectKeyFromObject(&item)
 					reqs = append(reqs, reconcile.Request{NamespacedName: key})
 				}
@@ -250,14 +307,14 @@ func (r *SubscriptionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func possible(all []olmv1.Bundle, installed string) []olmv1.Bundle {
+func possible(pkg *olmv1.Package, installed string) []olmv1.Bundle {
 	if installed == "" {
-		return all
+		return pkg.Bundles
 	}
 	filtered := []olmv1.Bundle{}
-	for _, b := range all {
+	for _, b := range pkg.Bundles {
 		for _, uf := range b.UpgradesFrom {
-			if uf == installed {
+			if fmt.Sprintf("%s-v%s", pkg.Name, uf) == installed {
 				filtered = append(filtered, b)
 				break
 			}

@@ -63,6 +63,8 @@ const (
 // properties. A path selector evaluates candidate properties and reports the
 // name of the candidate that is chosen.
 type Candidate struct {
+	// Image is the bundle image for this candidate.
+	Image string `json:"image"`
 
 	// Version is the version of the candidate within the global set of all
 	// candidates of a particular package unique identifier for a candidate. Uniqueness is

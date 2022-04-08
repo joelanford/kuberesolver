@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	rukpakv1alpha1 "github.com/operator-framework/rukpak/api/v1alpha1"
+
 	olmv1 "kuberesolver/api/v1"
 	"kuberesolver/internal/pathselector"
 	"kuberesolver/internal/util"
@@ -12,7 +14,7 @@ import (
 type Request struct {
 	Package      olmv1.Package
 	Constraint   *olmv1.Constraint
-	Installed    *olmv1.Operator
+	Installed    *rukpakv1alpha1.BundleInstance
 	PathSelector pathselector.Selector
 }
 
@@ -37,7 +39,7 @@ type resolver struct {
 
 func (r resolver) Resolve(ctx context.Context, request Request) Result {
 	res := Result{}
-	all := allCandidateBundles(request.Package, request.Installed.Spec.Version)
+	all := allCandidateBundles(request.Package, request.Installed.Status.InstalledBundleName)
 	filtered, err := constrainCandidateBundles(all, request.Constraint)
 	if err != nil {
 		res.Message = fmt.Sprintf("Failed to apply constraint: %v", err)
@@ -70,7 +72,7 @@ func allCandidateBundles(pkg olmv1.Package, installed string) []olmv1.Bundle {
 		bundles = []olmv1.Bundle{}
 		for _, b := range pkg.Bundles {
 			for _, from := range b.UpgradesFrom {
-				if from == installed {
+				if fmt.Sprintf("%s-v%s", pkg.Name, from) == installed {
 					bundles = append(bundles, b)
 				}
 			}
